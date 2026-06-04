@@ -50,8 +50,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         enhanced_prompt = f"professional vector logo, {user_text}, minimalist, clean geometric lines, white background, modern design"
         encoded_prompt = urllib.parse.quote(enhanced_prompt)
         
-        # FIX: Swapped /p/ to /prompt/ for perfect open-tier compatibility
-        image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}"
+        # Unique seed to ensure fresh generations
+        seed = random.randint(1, 999999)
+        
+        # FIX: Using query parameters to eliminate 400 Bad Request pathing bugs
+        image_url = f"https://image.pollinations.ai/p/logo?prompt={encoded_prompt}&seed={seed}"
 
         # 3. Download the image using httpx (60-second timeout window)
         async with httpx.AsyncClient(timeout=60.0) as client:
@@ -94,7 +97,7 @@ def main() -> None:
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    logger.info("Starting bot polling with open-access AI generation...")
+    logger.info("Starting bot polling with query-based AI generation...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
