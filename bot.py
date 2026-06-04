@@ -1,7 +1,6 @@
 import os
 import logging
 import asyncio
-import urllib.parse
 import httpx
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
@@ -45,22 +44,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     )
 
     try:
-        # 2. Refine and sanitize the user's input to ensure Pollinations accepts it
-        # Clean special symbols that break URL paths and trigger 400 Bad Request
-        clean_input = user_text.replace(",", " ").replace("/", " ").replace("?", " ")
+        # 2. Let httpx handle parameters natively to prevent 400 Bad Request syntax bugs
+        base_url = "https://image.pollinations.ai/prompt/logo"
         
-        # Build a highly optimized logo prompt layout
-        base_prompt = f"professional minimalist vector logo design for {clean_input} clean geometric lines modern branding icon white background"
-        
-        # URL encode with %20 spaces to match the gen.pollinations.ai standards perfectly
-        encoded_prompt = urllib.parse.quote(base_prompt)
-        
-        # FIX: Switched to the modern, fully open, free generation engine route
-        image_url = f"https://gen.pollinations.ai/image/{encoded_prompt}"
+        # We pass everything cleanly through a params dictionary
+        import random
+        query_params = {
+            "prompt": f"professional minimalist vector logo design for {user_text}, clean geometric lines, modern branding icon, white background",
+            "width": 1024,
+            "height": 1024,
+            "seed": random.randint(1, 999999),
+            "nologo": "true"
+        }
 
         # 3. Download the image using httpx (60-second timeout window)
         async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.get(image_url)
+            # Passing params= query handles all spaces, characters, and commas flawlessly
+            response = await client.get(base_url, params=query_params)
             
             if response.status_code == 200:
                 # 4. Send the generated image directly to the user
@@ -99,7 +99,7 @@ def main() -> None:
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    logger.info("Starting bot polling with sanitized production AI generation...")
+    logger.info("Starting bot polling with bulletproof query logic...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
