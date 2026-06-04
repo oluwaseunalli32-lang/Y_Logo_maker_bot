@@ -15,13 +15,14 @@ TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a message when the command /start is issued."""
     user = update.effective_user
+    # Using HTML tags ensures underscores in Y_Logo_maker_bot don't break the parser
     welcome_text = (
-        f"🤖 **Welcome to Y_Logo_maker_bot, {user.first_name}!**\n\n"
+        f"🤖 <b>Welcome to Y_Logo_maker_bot, {user.first_name}!</b>\n\n"
         "Need a professional logo in seconds? Describe your brand, "
         "and let powerful AI handle the rest.\n\n"
         "👉 Type your brand name and style preference to begin!"
     )
-    await update.message.reply_text(welcome_text, parse_mode="Markdown")
+    await update.message.reply_text(welcome_text, parse_mode="HTML")
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a message when the command /help is issued."""
@@ -33,14 +34,14 @@ def main() -> None:
         logger.error("No TELEGRAM_BOT_TOKEN found in environment variables!")
         return
 
-    # 1. Set up a fresh event loop explicitly to fix Python 3.14+ MainThread error
+    # Set up a fresh event loop explicitly to fix Python 3.14+ MainThread error
     try:
         loop = asyncio.get_event_loop()
     except RuntimeError:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-    # 2. Build the application
+    # Build the application
     application = Application.builder().token(TOKEN).build()
 
     # Register commands
