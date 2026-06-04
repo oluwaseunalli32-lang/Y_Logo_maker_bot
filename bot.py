@@ -2,7 +2,8 @@ import os
 import logging
 import asyncio
 import httpx
-import hashlib
+import urllib.parse
+import random
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram.constants import ChatAction
@@ -40,48 +41,42 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     # Send an initial confirmation message
     status_message = await update.message.reply_text(
-        "🎨 <b>Creating your logo design...</b> Please wait a few seconds.", 
+        "🎨 <b>Creating your custom logo design...</b> Please wait a few seconds.", 
         parse_mode="HTML"
     )
 
     try:
-        # Convert text input into a stable numerical seed string 
-        # This guarantees unique variations but avoids complex formatting parsing strings
-        seed_hash = int(hashlib.md5(user_text.encode('utf-8')).hexdigest(), 16) % 10000
+        # 2. Frame a strict, optimized prompt for actual graphics generation
+        clean_text = user_text.replace("/", " ").replace("?", " ").replace("&", "and")
+        logo_prompt = f"professional minimalist vector logo design for {clean_text}, clean geometric lines, modern branding icon, white background, high resolution digital graphic"
         
-        # Unlocked public-domain generation network endpoint
-        image_url = f"https://picsum.photos/id/{seed_hash}/1024/1024"
+        # Safely URL encode the prompt text
+        encoded_prompt = urllib.parse.quote(logo_prompt)
+        seed = random.randint(1, 999999)
         
-        # Secondary fallback if the text converts into an out-of-bounds index element
-        if seed_hash > 1084:
-            alt_seed = seed_hash % 1000
-            image_url = f"https://picsum.photos/v2/list?page={alt_seed}&limit=1"
+        # Using a verified unauthenticated public AI rendering pipe mirror
+        image_url = f"https://image.pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&seed={seed}&nofeed=true"
 
-        # 3. Download the graphic vector using httpx (60-second timeout window)
+        # 3. Download the graphic using httpx (60-second timeout window)
         async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
             response = await client.get(image_url)
             
-            # Handle list parsing if the fallback index was used
-            if response.status_code == 200 and isinstance(response.json(), list):
-                download_url = response.json()[0]["download_url"]
-                response = await client.get(download_url)
-
-            if response.status_code == 200:
-                # 4. Send the generated design safely back to the user chat window
+            if response.status_code == 200 and len(response.content) > 5000:
+                # 4. Send the real generated design back to the user
                 await context.bot.send_photo(
                     chat_id=chat_id,
                     photo=response.content,
-                    caption=f"✅ <b>Here is your vector concept for:</b>\n<i>\"{user_text}\"</i>",
+                    caption=f"✅ <b>Here is your unique logo concept for:</b>\n<i>\"{user_text}\"</i>",
                     parse_mode="HTML"
                 )
                 await status_message.delete()
             else:
                 logger.error(f"API returned status code: {response.status_code}")
-                await status_message.edit_text(f"❌ Creation engine is temporarily busy. Please try another brand prompt style description!")
+                await status_message.edit_text(f"❌ Generation took too long or was restricted. Please try a slightly shorter description!")
 
     except Exception as e:
         logger.exception("Error generating logo details:") 
-        await status_message.edit_text("⚠️ An error occurred while compiling your design template asset. Please try again.")
+        await status_message.edit_text("⚠️ An error occurred while rendering your design. Please try again.")
 
 def main() -> None:
     """Start the bot."""
@@ -103,7 +98,7 @@ def main() -> None:
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    logger.info("Starting bot framework pipeline deployment loop...")
+    logger.info("Starting bot pipeline with verified rendering mirrors...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
