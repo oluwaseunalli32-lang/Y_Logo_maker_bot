@@ -50,10 +50,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         enhanced_prompt = f"professional vector logo, {user_text}, minimalist, clean geometric lines, white background, modern design"
         encoded_prompt = urllib.parse.quote(enhanced_prompt)
         
-        seed = random.randint(1, 999999)
-        
-        # FIX: Removed '&model=flux' to completely bypass the 402 Payment Required limit
-        image_url = f"https://image.pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&seed={seed}"
+        # Completely stripped down, clean URL layout to eliminate 402 restrictions
+        image_url = f"https://image.pollinations.ai/p/{encoded_prompt}"
 
         # 3. Download the image using httpx (60-second timeout window)
         async with httpx.AsyncClient(timeout=60.0) as client:
