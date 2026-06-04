@@ -50,8 +50,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         enhanced_prompt = f"professional vector logo, {user_text}, minimalist, clean geometric lines, white background, modern design"
         encoded_prompt = urllib.parse.quote(enhanced_prompt)
         
-        # Completely stripped down, clean URL layout to eliminate 402 restrictions
-        image_url = f"https://image.pollinations.ai/p/{encoded_prompt}"
+        # FIX: Swapped /p/ to /prompt/ for perfect open-tier compatibility
+        image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}"
 
         # 3. Download the image using httpx (60-second timeout window)
         async with httpx.AsyncClient(timeout=60.0) as client:
