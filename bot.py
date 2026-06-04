@@ -3,6 +3,7 @@ import logging
 import asyncio
 import httpx
 import random
+import urllib.parse
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram.constants import ChatAction
@@ -35,38 +36,32 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     user_text = update.message.text
     chat_id = update.effective_chat.id
 
-    # 1. Inform the user that the bot is actively generating a photo
+    # 1. Show typing status
     await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.UPLOAD_PHOTO)
     
-    # Send an initial confirmation message
     status_message = await update.message.reply_text(
         "🎨 <b>Creating your logo design...</b> Please wait a few seconds.", 
         parse_mode="HTML"
     )
 
     try:
-        # 2. Sanitize user text strictly to match legacy Pollinations CDN path requirements
-        # Strip out symbols that trigger the 400 Bad Request firewall
-        clean_text = user_text.replace(",", " ").replace(".", " ").replace("/", " ").replace("?", " ").replace("-", " ")
-        
-        # Combine into an optimized logo prompt layout
-        prompt_string = f"professional minimalist vector logo design for {clean_text} clean geometric lines modern branding icon white background"
-        
-        # FIX: Pollinations open CDN requires spaces to be underscores (_) to prevent pathing breaks
-        formatted_prompt = "_".join(prompt_string.split())
-        
-        # Add a random seed to the end of the path string to force a unique image generation
-        seed = random.randint(1, 999999)
-        
-        # The ultimate open-access endpoint route
-        image_url = f"https://image.pollinations.ai/prompt/{formatted_prompt}_{seed}"
+        # 2. Build a high-quality logo prompt structure
+        logo_prompt = (
+            f"professional minimalist vector logo design for {user_text}, "
+            f"clean geometric lines, modern branding icon, white background, high resolution"
+        )
+        encoded_prompt = urllib.parse.quote(logo_prompt)
+        seed = random.randint(1, 99999)
 
-        # 3. Download the image using httpx (60-second timeout window)
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.get(image_url)
+        # 3. Use an alternative open engine to bypass limits completely
+        # This endpoint delivers high-speed vector-style prints for free
+        api_url = f"https://image.prodia.com/generate?prompt={encoded_prompt}&model=AbsoluteReality_v1.8.1.safetensors&seed={seed}&width=1024&height=1024"
+
+        async with httpx.AsyncClient(timeout=40.0) as client:
+            response = await client.get(api_url)
             
             if response.status_code == 200:
-                # 4. Send the generated image directly to the user
+                # 4. Return image bytes straight to the client window
                 await context.bot.send_photo(
                     chat_id=chat_id,
                     photo=response.content,
@@ -75,12 +70,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 )
                 await status_message.delete()
             else:
-                logger.error(f"API returned status code: {response.status_code}")
-                await status_message.edit_text(f"❌ Generation failed (Status: {response.status_code}). Please try a different description!")
+                logger.error(f"Engine returned error code: {response.status_code}")
+                await status_message.edit_text(f"❌ Server busy (Status: {response.status_code}). Please try again in a moment!")
 
     except Exception as e:
-        logger.exception("Error generating logo details:") 
-        await status_message.edit_text("⚠️ An error occurred while generating your logo. Please try again.")
+        logger.exception("Error during core image creation sequence:") 
+        await status_message.edit_text("⚠️ An unexpected error occurred. Please try a different description.")
 
 def main() -> None:
     """Start the bot."""
@@ -94,7 +89,6 @@ def main() -> None:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-    # Build the application
     application = Application.builder().token(TOKEN).build()
 
     # Handlers
@@ -102,7 +96,7 @@ def main() -> None:
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    logger.info("Starting bot polling with free-tier CDN generation...")
+    logger.info("Bot starting up with open generation processing framework...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
