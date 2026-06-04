@@ -2,6 +2,7 @@ import os
 import logging
 import asyncio
 import urllib.parse
+import random
 import httpx
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
@@ -46,21 +47,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     try:
         # 2. Refine the user's input into a professional logo prompt
-        # We append styling keywords to make sure the AI outputs a high-quality logo
         enhanced_prompt = f"professional vector logo, {user_text}, minimalist, clean geometric lines, white background, modern design"
-        
-        # Safely encode the prompt for a URL layout
         encoded_prompt = urllib.parse.quote(enhanced_prompt)
         
-        # Use a random seed to ensure unique generations every time
-        import random
         seed = random.randint(1, 999999)
         
-        # Pollinations AI Endpoint (Flux model for sharp text/shapes)
+        # Pollinations AI Endpoint
         image_url = f"https://image.pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&seed={seed}&model=flux"
 
-        # 3. Download the image using httpx
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        # 3. Download the image using httpx (60-second timeout window)
+        async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.get(image_url)
             
             if response.status_code == 200:
@@ -71,13 +67,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     caption=f"✅ <b>Here is your logo for:</b>\n<i>\"{user_text}\"</i>",
                     parse_mode="HTML"
                 )
-                # Remove the temporary status text
                 await status_message.delete()
             else:
-                await status_message.edit_text("❌ Generation failed. Please try a different description!")
+                logger.error(f"API returned status code: {response.status_code}")
+                await status_message.edit_text(f"❌ Generation failed (Status: {response.status_code}). Please try a different description!")
 
     except Exception as e:
-        logger.error(f"Error generating logo: {e}")
+        # Prints full structural traceback logs to Render
+        logger.exception("Error generating logo details:") 
         await status_message.edit_text("⚠️ An error occurred while generating your logo. Please try again.")
 
 def main() -> None:
@@ -86,12 +83,14 @@ def main() -> None:
         logger.error("No TELEGRAM_BOT_TOKEN found in environment variables!")
         return
 
+    # Set up a fresh event loop explicitly to fix Python 3.14+ MainThread error
     try:
         loop = asyncio.get_event_loop()
     except RuntimeError:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
+    # Build the application
     application = Application.builder().token(TOKEN).build()
 
     # Handlers
