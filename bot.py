@@ -1,5 +1,6 @@
 import os
 import logging
+import asyncio
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
@@ -9,7 +10,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Fallback token for local testing (Never hardcode production tokens!)
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -33,7 +33,14 @@ def main() -> None:
         logger.error("No TELEGRAM_BOT_TOKEN found in environment variables!")
         return
 
-    # Create the Application and pass it your bot's token.
+    # 1. Set up a fresh event loop explicitly to fix Python 3.14+ MainThread error
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    # 2. Build the application
     application = Application.builder().token(TOKEN).build()
 
     # Register commands
