@@ -2,6 +2,7 @@ import os
 import logging
 import asyncio
 import httpx
+import random
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram.constants import ChatAction
@@ -44,23 +45,25 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     )
 
     try:
-        # 2. Let httpx handle parameters natively to prevent 400 Bad Request syntax bugs
-        base_url = "https://image.pollinations.ai/prompt/logo"
+        # 2. Sanitize user text strictly to match legacy Pollinations CDN path requirements
+        # Strip out symbols that trigger the 400 Bad Request firewall
+        clean_text = user_text.replace(",", " ").replace(".", " ").replace("/", " ").replace("?", " ").replace("-", " ")
         
-        # We pass everything cleanly through a params dictionary
-        import random
-        query_params = {
-            "prompt": f"professional minimalist vector logo design for {user_text}, clean geometric lines, modern branding icon, white background",
-            "width": 1024,
-            "height": 1024,
-            "seed": random.randint(1, 999999),
-            "nologo": "true"
-        }
+        # Combine into an optimized logo prompt layout
+        prompt_string = f"professional minimalist vector logo design for {clean_text} clean geometric lines modern branding icon white background"
+        
+        # FIX: Pollinations open CDN requires spaces to be underscores (_) to prevent pathing breaks
+        formatted_prompt = "_".join(prompt_string.split())
+        
+        # Add a random seed to the end of the path string to force a unique image generation
+        seed = random.randint(1, 999999)
+        
+        # The ultimate open-access endpoint route
+        image_url = f"https://image.pollinations.ai/prompt/{formatted_prompt}_{seed}"
 
         # 3. Download the image using httpx (60-second timeout window)
         async with httpx.AsyncClient(timeout=60.0) as client:
-            # Passing params= query handles all spaces, characters, and commas flawlessly
-            response = await client.get(base_url, params=query_params)
+            response = await client.get(image_url)
             
             if response.status_code == 200:
                 # 4. Send the generated image directly to the user
@@ -73,7 +76,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 await status_message.delete()
             else:
                 logger.error(f"API returned status code: {response.status_code}")
-                await status_message.edit_text(f"❌ Generation failed (Status: {response.status_code}). Please try a shorter description!")
+                await status_message.edit_text(f"❌ Generation failed (Status: {response.status_code}). Please try a different description!")
 
     except Exception as e:
         logger.exception("Error generating logo details:") 
@@ -99,7 +102,7 @@ def main() -> None:
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    logger.info("Starting bot polling with bulletproof query logic...")
+    logger.info("Starting bot polling with free-tier CDN generation...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
