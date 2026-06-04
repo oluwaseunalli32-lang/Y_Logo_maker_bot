@@ -2,7 +2,6 @@ import os
 import logging
 import asyncio
 import urllib.parse
-import random
 import httpx
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
@@ -46,15 +45,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     )
 
     try:
-        # 2. Refine the user's input into a professional logo prompt
-        enhanced_prompt = f"professional vector logo, {user_text}, minimalist, clean geometric lines, white background, modern design"
-        encoded_prompt = urllib.parse.quote(enhanced_prompt)
+        # 2. Refine and sanitize the user's input to ensure Pollinations accepts it
+        # Clean special symbols that break URL paths and trigger 400 Bad Request
+        clean_input = user_text.replace(",", " ").replace("/", " ").replace("?", " ")
         
-        # Unique seed to ensure fresh generations
-        seed = random.randint(1, 999999)
+        # Build a highly optimized logo prompt layout
+        base_prompt = f"professional minimalist vector logo design for {clean_input} clean geometric lines modern branding icon white background"
         
-        # FIX: Using query parameters to eliminate 400 Bad Request pathing bugs
-        image_url = f"https://image.pollinations.ai/p/logo?prompt={encoded_prompt}&seed={seed}"
+        # URL encode with %20 spaces to match the gen.pollinations.ai standards perfectly
+        encoded_prompt = urllib.parse.quote(base_prompt)
+        
+        # FIX: Switched to the modern, fully open, free generation engine route
+        image_url = f"https://gen.pollinations.ai/image/{encoded_prompt}"
 
         # 3. Download the image using httpx (60-second timeout window)
         async with httpx.AsyncClient(timeout=60.0) as client:
@@ -71,7 +73,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 await status_message.delete()
             else:
                 logger.error(f"API returned status code: {response.status_code}")
-                await status_message.edit_text(f"❌ Generation failed (Status: {response.status_code}). Please try a different description!")
+                await status_message.edit_text(f"❌ Generation failed (Status: {response.status_code}). Please try a shorter description!")
 
     except Exception as e:
         logger.exception("Error generating logo details:") 
@@ -97,7 +99,7 @@ def main() -> None:
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    logger.info("Starting bot polling with query-based AI generation...")
+    logger.info("Starting bot polling with sanitized production AI generation...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
