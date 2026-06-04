@@ -52,8 +52,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
         seed = random.randint(1, 999999)
         
-        # Pollinations AI Endpoint
-        image_url = f"https://image.pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&seed={seed}&model=flux"
+        # FIX: Removed '&model=flux' to completely bypass the 402 Payment Required limit
+        image_url = f"https://image.pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&seed={seed}"
 
         # 3. Download the image using httpx (60-second timeout window)
         async with httpx.AsyncClient(timeout=60.0) as client:
@@ -73,7 +73,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 await status_message.edit_text(f"❌ Generation failed (Status: {response.status_code}). Please try a different description!")
 
     except Exception as e:
-        # Prints full structural traceback logs to Render
         logger.exception("Error generating logo details:") 
         await status_message.edit_text("⚠️ An error occurred while generating your logo. Please try again.")
 
@@ -83,7 +82,6 @@ def main() -> None:
         logger.error("No TELEGRAM_BOT_TOKEN found in environment variables!")
         return
 
-    # Set up a fresh event loop explicitly to fix Python 3.14+ MainThread error
     try:
         loop = asyncio.get_event_loop()
     except RuntimeError:
@@ -98,7 +96,7 @@ def main() -> None:
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    logger.info("Starting bot polling with real AI generation...")
+    logger.info("Starting bot polling with open-access AI generation...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
