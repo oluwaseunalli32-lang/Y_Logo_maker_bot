@@ -46,21 +46,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     )
 
     try:
-        # 2. Frame a strict, optimized prompt for actual graphics generation
+        # 2. Build an optimized text prompt for flat graphic generation
         clean_text = user_text.replace("/", " ").replace("?", " ").replace("&", "and")
-        logo_prompt = f"professional minimalist vector logo design for {clean_text}, clean geometric lines, modern branding icon, white background, high resolution digital graphic"
         
-        # Safely URL encode the prompt text
-        encoded_prompt = urllib.parse.quote(logo_prompt)
-        seed = random.randint(1, 999999)
+        # Heavy styling tags guarantee a logo instead of a photo
+        logo_prompt = f"professional minimalist vector logo design icon for {clean_text} clean geometric lines flat 2d style corporate branding white background"
         
-        # Using a verified unauthenticated public AI rendering pipe mirror
-        image_url = f"https://image.pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&seed={seed}&nofeed=true"
+        # Spaces replaced with underscores to perfectly match the free public proxy
+        formatted_prompt = "_".join(logo_prompt.split())
+        seed = random.randint(1, 99999)
+        
+        # FIX: The exact public, unauthenticated markdown endpoint layout
+        image_url = f"https://image.pollinations.ai/prompt/{formatted_prompt}_{seed}"
 
         # 3. Download the graphic using httpx (60-second timeout window)
         async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
             response = await client.get(image_url)
             
+            # Verify we received a true image file payload back
             if response.status_code == 200 and len(response.content) > 5000:
                 # 4. Send the real generated design back to the user
                 await context.bot.send_photo(
@@ -72,7 +75,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 await status_message.delete()
             else:
                 logger.error(f"API returned status code: {response.status_code}")
-                await status_message.edit_text(f"❌ Generation took too long or was restricted. Please try a slightly shorter description!")
+                await status_message.edit_text(f"❌ The generation server is taking too long. Please try a different description word!")
 
     except Exception as e:
         logger.exception("Error generating logo details:") 
