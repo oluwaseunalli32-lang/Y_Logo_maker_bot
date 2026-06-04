@@ -1,6 +1,8 @@
 import os
 import logging
 import asyncio
+import urllib.parse
+import httpx
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram.constants import ChatAction
@@ -29,25 +31,54 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await update.message.reply_text("Just send me your brand name and design preferences!")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle incoming user text descriptions for logos."""
+    """Handle incoming user text descriptions, generate a logo, and send it."""
     user_text = update.message.text
     chat_id = update.effective_chat.id
 
-    # 1. Show a 'Visual Status' so the user knows the bot is working
-    # Since we aren't generating a real image yet, we'll use "TYPING"
-    # Once you connect an image API later, change ChatAction.TYPING to ChatAction.UPLOAD_PHOTO
-    await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+    # 1. Inform the user that the bot is actively generating a photo
+    await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.UPLOAD_PHOTO)
     
-    # Simulate a tiny delay for realism
-    await asyncio.sleep(1.5)
-
-    # 2. Reply acknowledging their prompt
-    response_text = (
-        f"🎨 <b>Got it!</b> Analyzing your brand request:\n"
-        f"<i>\"{user_text}\"</i>\n\n"
-        f"⏳ Image generation pipeline blueprint is ready! (Connect your AI generation API here next)."
+    # Send an initial confirmation message
+    status_message = await update.message.reply_text(
+        "🎨 <b>Creating your logo design...</b> Please wait a few seconds.", 
+        parse_mode="HTML"
     )
-    await update.message.reply_text(response_text, parse_mode="HTML")
+
+    try:
+        # 2. Refine the user's input into a professional logo prompt
+        # We append styling keywords to make sure the AI outputs a high-quality logo
+        enhanced_prompt = f"professional vector logo, {user_text}, minimalist, clean geometric lines, white background, modern design"
+        
+        # Safely encode the prompt for a URL layout
+        encoded_prompt = urllib.parse.quote(enhanced_prompt)
+        
+        # Use a random seed to ensure unique generations every time
+        import random
+        seed = random.randint(1, 999999)
+        
+        # Pollinations AI Endpoint (Flux model for sharp text/shapes)
+        image_url = f"https://image.pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&seed={seed}&model=flux"
+
+        # 3. Download the image using httpx
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(image_url)
+            
+            if response.status_code == 200:
+                # 4. Send the generated image directly to the user
+                await context.bot.send_photo(
+                    chat_id=chat_id,
+                    photo=response.content,
+                    caption=f"✅ <b>Here is your logo for:</b>\n<i>\"{user_text}\"</i>",
+                    parse_mode="HTML"
+                )
+                # Remove the temporary status text
+                await status_message.delete()
+            else:
+                await status_message.edit_text("❌ Generation failed. Please try a different description!")
+
+    except Exception as e:
+        logger.error(f"Error generating logo: {e}")
+        await status_message.edit_text("⚠️ An error occurred while generating your logo. Please try again.")
 
 def main() -> None:
     """Start the bot."""
@@ -63,14 +94,12 @@ def main() -> None:
 
     application = Application.builder().token(TOKEN).build()
 
-    # Command Handlers
+    # Handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
-
-    # Message Handler - This listens to all text messages that AREN'T commands
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    logger.info("Starting bot polling with message handler...")
+    logger.info("Starting bot polling with real AI generation...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
