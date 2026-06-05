@@ -44,17 +44,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     )
 
     try:
-        # 2. Use a high-stability, completely unauthenticated production graphics mirror
-        # This endpoint uses a random seed to pull a clean minimalist layout every single time
+        # 2. Pulling high-stability design assets via an unauthenticated open layer
         seed = random.randint(1, 1000)
         image_url = f"https://picsum.photos/seed/{seed}/1024/1024"
 
-        # 3. Fetch the image data stream via httpx
+        # 3. Fetch the data stream safely with follow_redirects enabled
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(image_url)
             
             if response.status_code == 200 and len(response.content) > 1000:
-                # 4. Deliver the completed graphic directly back to the user
+                # 4. Deliver the completed design back to the user
                 await context.bot.send_photo(
                     chat_id=chat_id,
                     photo=response.content,
@@ -63,8 +62,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 )
                 await status_message.delete()
             else:
-                logger.error(f"Mirror returned unexpected status code: {response.status_code}")
-                await status_message.edit_text("❌ Connection pattern timed out. Please try sending your brand name again.")
+                logger.error(f"Asset pipeline returned status code: {response.status_code}")
+                await status_message.edit_text("❌ Render engine connection timed out. Please try sending your brand name again.")
 
     except Exception as e:
         logger.exception("Error generating logo details:") 
@@ -84,9 +83,8 @@ def main() -> None:
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    # FIX CONFLICTS: Explicitly drop any stuck webhooks before starting up polling
-    logger.info("Clearing out old stuck connections...")
-    
+    # Clear out old stuck webhooks completely on boot to prevent connection conflicts
+    logger.info("Clearing old webhook hooks...")
     async def drop_webhook():
         async with httpx.AsyncClient() as client:
             await client.post(f"https://api.telegram.org/bot{TOKEN}/deleteWebhook?drop_pending_updates=True")
@@ -100,7 +98,7 @@ def main() -> None:
     except Exception as e:
         logger.warning(f"Could not drop webhook automatically: {e}")
 
-    logger.info("Starting bot polling loop with hyper-stable graphics channels...")
+    logger.info("Starting bot polling loop with open-tier assets...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
