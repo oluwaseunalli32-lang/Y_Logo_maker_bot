@@ -1,8 +1,7 @@
 import os
 import logging
-import asyncio
-import httpx
 import random
+import httpx
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram.constants import ChatAction
@@ -83,22 +82,8 @@ def main() -> None:
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    # Clear out old stuck webhooks completely on boot to prevent connection conflicts
-    logger.info("Clearing old webhook hooks...")
-    async def drop_webhook():
-        async with httpx.AsyncClient() as client:
-            await client.post(f"https://api.telegram.org/bot{TOKEN}/deleteWebhook?drop_pending_updates=True")
-    
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            loop.create_task(drop_webhook())
-        else:
-            loop.run_until_complete(drop_webhook())
-    except Exception as e:
-        logger.warning(f"Could not drop webhook automatically: {e}")
-
-    logger.info("Starting bot polling loop with open-tier assets...")
+    # Let run_polling cleanly handle the loop configuration on its own
+    logger.info("Starting bot polling loop...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
