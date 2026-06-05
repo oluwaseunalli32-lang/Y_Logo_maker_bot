@@ -2,7 +2,6 @@ import os
 import logging
 import asyncio
 import httpx
-import urllib.parse
 import random
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
@@ -46,22 +45,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     )
 
     try:
-        # 2. Build a high-quality logo vector prompt
+        # 2. Build a high-quality logo vector prompt layout
         clean_text = user_text.replace("/", " ").replace("?", " ").replace("&", "and")
         logo_prompt = f"professional minimalist vector logo design for {clean_text}, flat 2d graphic layout, clean geometric lines, white background, high contrast, modern icon"
         
-        # Standard web encoding (keeps the text readable for the API)
-        encoded_prompt = urllib.parse.quote(logo_prompt)
-        seed = random.randint(1, 99999)
+        # 3. Use Hugging Face's open-access PixArt inference API (No API keys or signup required)
+        api_url = "https://api-inference.huggingface.co/models/PixArt-alpha/PixArt-XL-2-1024-MS"
         
-        # FIX: The official open, free-tier image rendering endpoint path
-        image_url = f"https://gen.pollinations.ai/image/{encoded_prompt}?seed={seed}"
+        headers = {"Content-Type": "application/json"}
+        payload = {
+            "inputs": logo_prompt,
+            "options": {"wait_for_model": True}
+        }
 
-        # 3. Download the graphic using httpx (60-second timeout window)
-        async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
-            response = await client.get(image_url)
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(api_url, json=payload, headers=headers)
             
-            # Verify we received a true image file payload back
+            # Verify we received a valid image byte stream back
             if response.status_code == 200 and len(response.content) > 5000:
                 # 4. Send the real generated design back to the user
                 await context.bot.send_photo(
@@ -73,7 +73,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 await status_message.delete()
             else:
                 logger.error(f"API returned status code: {response.status_code}")
-                await status_message.edit_text(f"❌ Server busy. Please try a different description or keyword!")
+                await status_message.edit_text("❌ The generation server is currently cycling. Please wait a moment and try again!")
 
     except Exception as e:
         logger.exception("Error generating logo details:") 
@@ -99,7 +99,7 @@ def main() -> None:
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    logger.info("Starting bot pipeline with verified free-tier endpoints...")
+    logger.info("Starting bot pipeline with open Hugging Face API layers...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
