@@ -3,7 +3,7 @@ import logging
 import random
 import httpx
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram.constants import ChatAction
 
 # Enable logging
@@ -74,15 +74,15 @@ def main() -> None:
         logger.error("No TELEGRAM_BOT_TOKEN found in environment variables!")
         return
 
-    # Initialize the Application
-    application = Application.builder().token(TOKEN).build()
+    # Initialize the Application using the proper modern builder format
+    application = ApplicationBuilder().token(TOKEN).build()
 
     # Add handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    # Start polling
+    # Start polling loop
     logger.info("Starting bot polling loop with clean dependency structures...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
