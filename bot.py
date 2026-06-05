@@ -43,7 +43,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     )
 
     try:
-        # 2. Pulling high-stability design assets via an unauthenticated open layer
+        # 2. Pulling high-stability design assets via an unauthenticated open layer (Picsum)
         seed = random.randint(1, 1000)
         image_url = f"https://picsum.photos/seed/{seed}/1024/1024"
 
@@ -82,8 +82,8 @@ def main() -> None:
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    # Let run_polling cleanly handle the loop configuration on its own
-    logger.info("Starting bot polling loop...")
+    # Start polling
+    logger.info("Starting bot polling loop with clean dependency structures...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
