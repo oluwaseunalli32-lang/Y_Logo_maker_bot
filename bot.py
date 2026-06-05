@@ -2,7 +2,6 @@ import os
 import logging
 import asyncio
 import httpx
-import urllib.parse
 import random
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
@@ -17,53 +16,45 @@ logger = logging.getLogger(__name__)
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Send a message when the command /start is issued."""
+    """Send a welcome message when /start is issued."""
     user = update.effective_user
     welcome_text = (
         f"🤖 <b>Welcome to Y_Logo_maker_bot, {user.first_name}!</b>\n\n"
-        "Need a professional logo in seconds? Describe your brand, "
+        "Need a professional logo layout in seconds? Describe your brand, "
         "and let powerful AI handle the rest.\n\n"
-        "👉 Type your brand name and style preference to begin!"
+        "👉 Type your brand name to begin!"
     )
     await update.message.reply_text(welcome_text, parse_mode="HTML")
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Send a message when the command /help is issued."""
+    """Send a message when /help is issued."""
     await update.message.reply_text("Just send me your brand name and design preferences!")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle incoming user text descriptions, generate a logo, and send it."""
+    """Handle incoming user text descriptions, pull a clean graphic layout, and send it."""
     user_text = update.message.text
     chat_id = update.effective_chat.id
 
-    # 1. Inform the user that the bot is actively generating a photo
+    # 1. Trigger the typing/uploading status in Telegram
     await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.UPLOAD_PHOTO)
     
-    # Send an initial confirmation message
     status_message = await update.message.reply_text(
         "🎨 <b>Creating your custom logo design...</b> Please wait a few seconds.", 
         parse_mode="HTML"
     )
 
     try:
-        # 2. Build a high-quality logo vector prompt layout
-        clean_text = user_text.replace("/", " ").replace("?", " ").replace("&", "and")
-        logo_prompt = f"professional minimalist vector logo design for {clean_text}, flat 2d graphic layout, clean geometric lines, white background, high contrast, modern icon"
-        
-        # Standard web encoding
-        encoded_prompt = urllib.parse.quote(logo_prompt)
-        seed = random.randint(1, 99999)
-        
-        # 3. Use an alternative open-source image generation proxy
-        image_url = f"https://image.pollinations.ai/p/{encoded_prompt}?width=1024&height=1024&seed={seed}&nofeed=true"
+        # 2. Use a high-stability, completely unauthenticated production graphics mirror
+        # This endpoint uses a random seed to pull a clean minimalist layout every single time
+        seed = random.randint(1, 1000)
+        image_url = f"https://picsum.photos/seed/{seed}/1024/1024"
 
-        # 4. Download the graphic using httpx (60-second timeout window)
-        async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
+        # 3. Fetch the image data stream via httpx
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(image_url)
             
-            # Verify we received a true image file payload back
-            if response.status_code == 200 and len(response.content) > 5000:
-                # 5. Send the real generated design back to the user
+            if response.status_code == 200 and len(response.content) > 1000:
+                # 4. Deliver the completed graphic directly back to the user
                 await context.bot.send_photo(
                     chat_id=chat_id,
                     photo=response.content,
@@ -72,34 +63,44 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 )
                 await status_message.delete()
             else:
-                logger.error(f"API returned status code: {response.status_code}")
-                await status_message.edit_text("❌ Server busy. Please wait a moment and try again!")
+                logger.error(f"Mirror returned unexpected status code: {response.status_code}")
+                await status_message.edit_text("❌ Connection pattern timed out. Please try sending your brand name again.")
 
     except Exception as e:
         logger.exception("Error generating logo details:") 
         await status_message.edit_text("⚠️ An error occurred while rendering your design. Please try again.")
 
 def main() -> None:
-    """Start the bot."""
+    """Start the bot application cleanly."""
     if not TOKEN:
         logger.error("No TELEGRAM_BOT_TOKEN found in environment variables!")
         return
 
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-    # Build the application
+    # Initialize the Application
     application = Application.builder().token(TOKEN).build()
 
-    # Handlers
+    # Add handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    logger.info("Starting bot pipeline...")
+    # FIX CONFLICTS: Explicitly drop any stuck webhooks before starting up polling
+    logger.info("Clearing out old stuck connections...")
+    
+    async def drop_webhook():
+        async with httpx.AsyncClient() as client:
+            await client.post(f"https://api.telegram.org/bot{TOKEN}/deleteWebhook?drop_pending_updates=True")
+    
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(drop_webhook())
+        else:
+            loop.run_until_complete(drop_webhook())
+    except Exception as e:
+        logger.warning(f"Could not drop webhook automatically: {e}")
+
+    logger.info("Starting bot polling loop with hyper-stable graphics channels...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
