@@ -46,18 +46,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     )
 
     try:
-        # 2. Build an optimized text prompt for flat graphic generation
+        # 2. Build a high-quality logo vector prompt
         clean_text = user_text.replace("/", " ").replace("?", " ").replace("&", "and")
+        logo_prompt = f"professional minimalist vector logo design for {clean_text}, flat 2d graphic layout, clean geometric lines, white background, high contrast, modern icon"
         
-        # Heavy styling tags guarantee a logo instead of a photo
-        logo_prompt = f"professional minimalist vector logo design icon for {clean_text} clean geometric lines flat 2d style corporate branding white background"
-        
-        # Spaces replaced with underscores to perfectly match the free public proxy
-        formatted_prompt = "_".join(logo_prompt.split())
+        # Standard web encoding (keeps the text readable for the API)
+        encoded_prompt = urllib.parse.quote(logo_prompt)
         seed = random.randint(1, 99999)
         
-        # FIX: The exact public, unauthenticated markdown endpoint layout
-        image_url = f"https://image.pollinations.ai/prompt/{formatted_prompt}_{seed}"
+        # FIX: The official open, free-tier image rendering endpoint path
+        image_url = f"https://gen.pollinations.ai/image/{encoded_prompt}?seed={seed}"
 
         # 3. Download the graphic using httpx (60-second timeout window)
         async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
@@ -75,7 +73,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 await status_message.delete()
             else:
                 logger.error(f"API returned status code: {response.status_code}")
-                await status_message.edit_text(f"❌ The generation server is taking too long. Please try a different description word!")
+                await status_message.edit_text(f"❌ Server busy. Please try a different description or keyword!")
 
     except Exception as e:
         logger.exception("Error generating logo details:") 
@@ -101,7 +99,7 @@ def main() -> None:
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    logger.info("Starting bot pipeline with verified rendering mirrors...")
+    logger.info("Starting bot pipeline with verified free-tier endpoints...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
